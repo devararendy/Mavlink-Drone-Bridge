@@ -12,17 +12,9 @@ class UdpServer(
     private val onDataReceived:
         (ByteArray) -> Unit = {}
 ) {
-    private var socket:
-            DatagramSocket? = null
-
-    private var serverJob:
-            Job? = null
-
-    private val clients =
-        ConcurrentHashMap<
-                String,
-                Pair<InetAddress, Int>
-                >()
+    private var socket: DatagramSocket? = null
+    private var serverJob: Job? = null
+    private val clients = ConcurrentHashMap<String, Pair<InetAddress, Int>>()
 
     fun stop() {
         serverJob?.cancel()

@@ -60,7 +60,10 @@ class MainActivity : ComponentActivity() {
                         vm.netAddRx(it.size.toLong())
                         vm.usbAddTx(it.size.toLong())
                     }
-                }
+                },
+                onClientConnected = {addr, prt ->
+                    vm.addLog("UDP Client Connected: $addr:$prt")
+                },
             )
 
         tcpServer =
