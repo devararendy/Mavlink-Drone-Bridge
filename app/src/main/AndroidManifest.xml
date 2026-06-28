@@ -47,7 +47,7 @@
         </activity>
 
         <service
-            android:name=".BridgeService"
+            android:name=".service.BridgeService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 

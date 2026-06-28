@@ -1,4 +1,4 @@
-package com.example.bismillah_learn_1
+package com.example.bismillah_learn_1.service
 
 import android.app.Service
 import android.content.Intent
