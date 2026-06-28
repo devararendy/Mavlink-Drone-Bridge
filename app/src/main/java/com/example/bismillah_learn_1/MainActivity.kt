@@ -227,24 +227,18 @@ class MainActivity : ComponentActivity() {
                                         if (granted) {
                                             vm.addLog("USB Permission Granted")
                                             // Handle connection here
-                                            if (
-                                                usbManager.connect(
-                                                    115200
-                                                )
-                                            ) {
-
-                                                vm.addLog(
-                                                    "Serial Connected"
-                                                )
-
-                                                vm.setStatus(
-                                                    "USB Connected"
-                                                )
-
+                                            if (usbManager.connect(115200)) {
+                                                vm.addLog("Serial Connected")
+                                                vm.setStatus("USB Connected")
+                                                usbManager.startReading { data ->
+                                                    tcpServer?.broadcast(data)
+                                                    runOnUiThread {
+                                                        vm.addRx(data.size.toLong())
+                                                        vm.addLog("USB RX: ${data.decodeToString()}")
+                                                    }
+                                                }
                                             } else {
-                                                vm.addLog(
-                                                    "Serial Failed"
-                                                )
+                                                vm.addLog("Serial Failed")
                                             }
                                         } else {
                                             vm.addLog("USB Permission Denied")
@@ -268,17 +262,11 @@ class MainActivity : ComponentActivity() {
                                             "USB Connected"
                                         )
 
-                                        usbManager.startReading {
+                                        usbManager.startReading { data ->
+                                            tcpServer?.broadcast(data)
                                             runOnUiThread {
-                                                vm.addRx(
-                                                    it.size.toLong()
-                                                )
-
-                                                vm.addLog(
-                                                    "USB RX: " + it.decodeToString()
-                                                )
-
-                                                tcpServer?.broadcast(it)
+                                                vm.addRx(data.size.toLong())
+                                                vm.addLog("USB RX: ${data.decodeToString()}")
                                             }
                                         }
 
