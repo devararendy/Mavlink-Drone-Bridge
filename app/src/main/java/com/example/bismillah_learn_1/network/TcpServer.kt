@@ -22,31 +22,22 @@ class TcpServer(
     private var serverJob: Job? = null
 
     fun start() {
-
         if (serverJob != null)
             return
 
-        serverJob =
-            CoroutineScope(
-                Dispatchers.IO
-            ).launch {
+        serverJob = CoroutineScope(Dispatchers.IO).launch {
 
-                serverSocket =
-                    ServerSocket(port)
+                serverSocket = ServerSocket(port)
 
                 while (isActive) {
 
                     try {
 
-                        val client =
-                            serverSocket!!.accept()
+                        val client = serverSocket!!.accept()
 
                         clients.add(client)
 
-                        onClientConnected(
-                            client.inetAddress.hostAddress
-                                ?: "unknown"
-                        )
+                        onClientConnected(client.inetAddress.hostAddress ?: "unknown")
 
                         startReader(client)
 
@@ -63,36 +54,23 @@ class TcpServer(
         CoroutineScope(
             Dispatchers.IO
         ).launch {
-
-            val input: InputStream =
-                socket.getInputStream()
-
-            val buffer =
-                ByteArray(4096)
+            val input: InputStream = socket.getInputStream()
+            val buffer = ByteArray(4096)
 
             try {
-
                 while (socket.isConnected) {
-
-                    val len =
-                        input.read(buffer)
-
+                    val len = input.read(buffer)
                     if (len <= 0)
                         break
 
-                    onDataReceived(
-                        buffer.copyOf(len)
-                    )
+                    onDataReceived(buffer.copyOf(len))
                 }
 
             } catch (_: Exception) {
             }
 
             clients.remove(socket)
-
-            onClientDisconnected(
-                socket.inetAddress.hostAddress
-                    ?: "unknown"
+            onClientDisconnected(socket.inetAddress.hostAddress ?: "unknown"
             )
 
             socket.close()
@@ -102,14 +80,9 @@ class TcpServer(
     fun broadcast(
         data: ByteArray
     ) {
-
         clients.forEach {
-
             try {
-
-                val output:
-                        OutputStream =
-                    it.getOutputStream()
+                val output: OutputStream = it.getOutputStream()
 
                 output.write(data)
                 output.flush()
@@ -120,17 +93,13 @@ class TcpServer(
     }
 
     fun stop() {
-
         try {
-
             serverJob?.cancel()
-
             clients.forEach {
                 it.close()
             }
 
             clients.clear()
-
             serverSocket?.close()
 
         } catch (_: Exception) {
