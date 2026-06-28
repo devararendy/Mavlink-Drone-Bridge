@@ -43,27 +43,9 @@ class MainActivity : ComponentActivity() {
         tcpServer =
             TcpServer(
                 port = 5760,
-                onClientConnected = {
-                    runOnUiThread {
-                        vm.setStatus(
-                            "Client Connected"
-                        )
-                        vm.setClientCount(
-                            tcpServer?.clientCount() ?: 0
-                        )
-                    }
-                },
+                onClientConnected = { updateClientInfo("Client Connected") },
 
-                onClientDisconnected = {
-                    runOnUiThread {
-                        vm.setStatus(
-                            "Client Disconnected"
-                        )
-                        vm.setClientCount(
-                            tcpServer?.clientCount() ?: 0
-                        )
-                    }
-                },
+                onClientDisconnected = { updateClientInfo("Client Disconnected") },
 
                 onDataReceived = {
                     runOnUiThread {
@@ -226,20 +208,7 @@ class MainActivity : ComponentActivity() {
                                     usbReceiver = UsbPermissionReceiver.register(this@MainActivity) { granted ->
                                         if (granted) {
                                             vm.addLog("USB Permission Granted")
-                                            // Handle connection here
-                                            if (usbManager.connect(115200)) {
-                                                vm.addLog("Serial Connected")
-                                                vm.setStatus("USB Connected")
-                                                usbManager.startReading { data ->
-                                                    tcpServer?.broadcast(data)
-                                                    runOnUiThread {
-                                                        vm.addRx(data.size.toLong())
-                                                        vm.addLog("USB RX: ${data.decodeToString()}")
-                                                    }
-                                                }
-                                            } else {
-                                                vm.addLog("Serial Failed")
-                                            }
+                                            startSerialConnection(usbManager)
                                         } else {
                                             vm.addLog("USB Permission Denied")
                                         }
@@ -247,34 +216,7 @@ class MainActivity : ComponentActivity() {
                                     usbManager.requestPermission(driver)
                                 } else {
                                     vm.addLog("Permission already granted")
-                                    // Handle connection here
-                                    if (
-                                        usbManager.connect(
-                                            115200
-                                        )
-                                    ) {
-
-                                        vm.addLog(
-                                            "Serial Connected"
-                                        )
-
-                                        vm.setStatus(
-                                            "USB Connected"
-                                        )
-
-                                        usbManager.startReading { data ->
-                                            tcpServer?.broadcast(data)
-                                            runOnUiThread {
-                                                vm.addRx(data.size.toLong())
-                                                vm.addLog("USB RX: ${data.decodeToString()}")
-                                            }
-                                        }
-
-                                    } else {
-                                        vm.addLog(
-                                            "Serial Failed"
-                                        )
-                                    }
+                                    startSerialConnection(usbManager)
                                 }
 
                                 tcpServer?.start()
@@ -308,6 +250,29 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    private fun updateClientInfo(status: String) {
+        runOnUiThread {
+            vm.setStatus(status)
+            vm.setClientCount(tcpServer?.clientCount() ?: 0)
+        }
+    }
+
+    private fun startSerialConnection(usbManager: UsbSerialManager) {
+        if (usbManager.connect(115200)) {
+            vm.addLog("Serial Connected")
+            vm.setStatus("USB Connected")
+            usbManager.startReading { data ->
+                tcpServer?.broadcast(data)
+                runOnUiThread {
+                    vm.addRx(data.size.toLong())
+                    vm.addLog("USB RX: ${data.decodeToString()}")
+                }
+            }
+        } else {
+            vm.addLog("Serial Failed")
         }
     }
 
