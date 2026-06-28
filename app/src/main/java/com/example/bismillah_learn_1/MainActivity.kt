@@ -44,20 +44,14 @@ class MainActivity : ComponentActivity() {
             TcpServer(
                 port = 5760,
                 onClientConnected = { updateClientInfo("Client Connected") },
-
                 onClientDisconnected = { updateClientInfo("Client Disconnected") },
 
                 onDataReceived = {
-                    runOnUiThread {
-                        vm.addRx(
-                            it.size.toLong()
-                        )
-                    }
-
                     usbManager.write(it)
-                    vm.addTx(
-                        it.size.toLong()
-                    )
+                    runOnUiThread {
+                        vm.netAddRx(it.size.toLong())
+                        vm.usbAddTx(it.size.toLong())
+                    }
                 }
             )
 
@@ -66,7 +60,6 @@ class MainActivity : ComponentActivity() {
             vm.uiState.collectAsState()
 
             MaterialTheme {
-
                 Surface(
                     modifier =
                         Modifier.fillMaxSize()
@@ -84,84 +77,30 @@ class MainActivity : ComponentActivity() {
                     ) {
 
                         Text(
-                            text =
-                                "DroneBridge",
-                            style =
-                                MaterialTheme
-                                    .typography
-                                    .headlineMedium
+                            text = "DroneBridge",
+                            style = MaterialTheme.typography.headlineMedium
                         )
 
                         Card(
-                            modifier =
-                                Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-
-                            Column(
-                                modifier =
-                                    Modifier.padding(
-                                        16.dp
-                                    )
+                            Column(modifier = Modifier.padding(16.dp)
                             ) {
-
-                                Text(
-                                    "USB Device"
-                                )
-
-                                Text(
-                                    state.usbDeviceName
-                                )
-
-                                Spacer(
-                                    modifier =
-                                        Modifier.height(
-                                            8.dp
-                                        )
-                                )
-
-                                Text(
-                                    "TCP Port: ${
-                                        state.tcpPort
-                                    }"
-                                )
-
-                                Text(
-                                    "Status: ${
-                                        state.status
-                                    }"
-                                )
-
-                                Text(
-                                    "Clients: ${
-                                        state.clientCount
-                                    }"
-                                )
+                                Text("USB Device")
+                                Text(state.usbDeviceName)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("TCP Port: ${state.tcpPort}")
+                                Text("Status: ${state.status}")
+                                Text("Clients: ${state.clientCount}")
                             }
                         }
 
-                        Card(
-                            modifier =
-                                Modifier.fillMaxWidth()
-                        ) {
-
-                            Column(
-                                modifier =
-                                    Modifier.padding(
-                                        16.dp
-                                    )
-                            ) {
-
-                                Text(
-                                    "RX Bytes: ${
-                                        state.rxBytes
-                                    }"
-                                )
-
-                                Text(
-                                    "TX Bytes: ${
-                                        state.txBytes
-                                    }"
-                                )
+                        Card( modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text("USB RX Bytes: ${state.usbRxBytes}")
+                                Text("USB TX Bytes: ${state.usbTxBytes}")
+                                Text("Net RX Bytes: ${state.netRxBytes}")
+                                Text("Net TX Bytes: ${state.netTxBytes}")
                             }
                         }
 
@@ -238,6 +177,8 @@ class MainActivity : ComponentActivity() {
                             onClick = {
                                 tcpServer?.stop()
                                 vm.setRunning(false)
+                                usbManager.stopReading()
+                                usbManager.disconnect()
                                 vm.setStatus(
                                     "Stopped"
                                 )
@@ -267,7 +208,8 @@ class MainActivity : ComponentActivity() {
             usbManager.startReading { data ->
                 tcpServer?.broadcast(data)
                 runOnUiThread {
-                    vm.addRx(data.size.toLong())
+                    vm.usbAddRx(data.size.toLong())
+                    vm.netAddTx(data.size.toLong())
                     vm.addLog("USB RX: ${data.decodeToString()}")
                 }
             }

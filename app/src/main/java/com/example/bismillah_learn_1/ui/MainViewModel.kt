@@ -36,24 +36,28 @@ class MainViewModel : ViewModel() {
             )
     }
 
-    fun addRx(
+    fun usbAddRx(
         bytes: Long
     ) {
-        _uiState.value =
-            _uiState.value.copy(
-                rxBytes =
-                    _uiState.value.rxBytes + bytes
-            )
+        _uiState.value = _uiState.value.copy(usbRxBytes = _uiState.value.usbRxBytes + bytes)
     }
 
-    fun addTx(
+    fun usbAddTx(
         bytes: Long
     ) {
-        _uiState.value =
-            _uiState.value.copy(
-                txBytes =
-                    _uiState.value.txBytes + bytes
-            )
+        _uiState.value = _uiState.value.copy(usbTxBytes = _uiState.value.usbTxBytes + bytes)
+    }
+
+    fun netAddRx(
+        bytes: Long
+    ) {
+        _uiState.value = _uiState.value.copy(netRxBytes = _uiState.value.netRxBytes + bytes)
+    }
+
+    fun netAddTx(
+        bytes: Long
+    ) {
+        _uiState.value = _uiState.value.copy(netTxBytes = _uiState.value.netTxBytes + bytes)
     }
 
     fun setStatus(
