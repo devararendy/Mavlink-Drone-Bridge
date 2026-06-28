@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
                 onClientDisconnected = { updateClientInfo("Client Disconnected") },
 
                 onDataReceived = {
-                    usbManager.write(it)
+                    usbManager.enqueueWrite(it)
                     runOnUiThread {
                         vm.netAddRx(it.size.toLong())
                         vm.usbAddTx(it.size.toLong())
@@ -105,8 +105,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         Card(
-                            modifier =
-                                Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth()
                         ) {
 
                             Column(
@@ -118,21 +117,22 @@ class MainActivity : ComponentActivity() {
                                             rememberScrollState()
                                         )
                             ) {
-
                                 Text("Logs")
-
                                 state.logs.forEach {
-
                                     Text(it)
                                 }
                             }
                         }
 
                         Button(
-                            modifier =
-                                Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth(),
 
                             onClick = {
+                                if (usbManager.isConnected()) {
+                                    vm.addLog("USB already connected")
+                                    return@Button
+                                }
+
                                 val devices = usbManager.findDevices()
                                 if (devices.isEmpty()) {
                                     vm.addLog("No USB device found")
@@ -160,33 +160,24 @@ class MainActivity : ComponentActivity() {
 
                                 tcpServer?.start()
                                 vm.setRunning(true)
-                                vm.setStatus(
-                                    "Running"
-                                )
+                                vm.setStatus("Running")
                             }
                         ) {
-                            Text(
-                                "START"
-                            )
+                            Text("START")
                         }
 
                         OutlinedButton(
-                            modifier =
-                                Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth(),
 
                             onClick = {
                                 tcpServer?.stop()
                                 vm.setRunning(false)
                                 usbManager.stopReading()
                                 usbManager.disconnect()
-                                vm.setStatus(
-                                    "Stopped"
-                                )
+                                vm.setStatus("Stopped")
                             }
                         ) {
-                            Text(
-                                "STOP"
-                            )
+                            Text("STOP")
                         }
                     }
                 }

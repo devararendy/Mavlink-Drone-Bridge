@@ -12,6 +12,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.*
+import java.util.concurrent.LinkedBlockingQueue
 
 class UsbSerialManager(
     private val context: Context
@@ -23,8 +25,36 @@ class UsbSerialManager(
         ) as UsbManager
     private var currentPort:
             UsbSerialPort? = null
-
     private var readJob: Job? = null
+    private val txQueue = LinkedBlockingQueue<ByteArray>()
+    private var txJob: Job? = null
+
+    fun enqueueWrite(
+        data: ByteArray
+    ) {
+         txQueue.offer(data)
+    }
+
+    fun startWriter() {
+        if (txJob != null)
+            return
+
+        txJob = CoroutineScope(Dispatchers.IO).launch {
+            while (true) {
+                try {
+                    val data = txQueue.take()
+
+                    currentPort?.write(
+                        data,
+                        1000
+                    )
+
+                } catch (_: Exception) {
+                    break
+                }
+            }
+        }
+    }
 
     fun stopReading() {
         readJob?.cancel()
@@ -34,24 +64,16 @@ class UsbSerialManager(
     fun startReading(
         onData: (ByteArray) -> Unit
     ) {
-
         if (readJob != null)
             return
 
-        readJob =
-            CoroutineScope(
-                Dispatchers.IO
+        readJob = CoroutineScope(Dispatchers.IO
             ).launch {
-
-                val buffer =
-                    ByteArray(4096)
-
+                val buffer = ByteArray(4096)
                 while (isActive &&
                     currentPort != null
                 ) {
-
                     try {
-
                         val len =
                             currentPort!!.read(
                                 buffer,
@@ -59,10 +81,7 @@ class UsbSerialManager(
                             )
 
                         if (len > 0) {
-
-                            onData(
-                                buffer.copyOf(len)
-                            )
+                            onData(buffer.copyOf(len))
                         }
 
                     } catch (_: Exception) {
@@ -95,6 +114,10 @@ class UsbSerialManager(
     }
 
     fun disconnect() {
+        txJob?.cancel()
+        txJob = null
+        txQueue.clear()
+
         try {
             currentPort?.close()
         } catch (_: Exception) {
@@ -140,6 +163,7 @@ class UsbSerialManager(
 
         currentPort = port
 
+        startWriter()
         return true
     }
 
