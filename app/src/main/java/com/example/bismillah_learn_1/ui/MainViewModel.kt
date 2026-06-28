@@ -42,10 +42,22 @@ class MainViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(usbRxBytes = _uiState.value.usbRxBytes + bytes)
     }
 
+    fun setUsbRx(
+        bytes: Long
+    ) {
+        _uiState.value = _uiState.value.copy(usbRxBytes = bytes)
+    }
+
     fun usbAddTx(
         bytes: Long
     ) {
         _uiState.value = _uiState.value.copy(usbTxBytes = _uiState.value.usbTxBytes + bytes)
+    }
+
+    fun setUsbTx(
+        bytes: Long
+    ) {
+        _uiState.value = _uiState.value.copy(usbTxBytes = bytes)
     }
 
     fun netAddRx(
@@ -54,10 +66,22 @@ class MainViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(netRxBytes = _uiState.value.netRxBytes + bytes)
     }
 
+    fun setNetRx(
+        bytes: Long
+    ) {
+        _uiState.value = _uiState.value.copy(netRxBytes = bytes)
+    }
+
     fun netAddTx(
         bytes: Long
     ) {
         _uiState.value = _uiState.value.copy(netTxBytes = _uiState.value.netTxBytes + bytes)
+    }
+
+    fun setNetTx(
+        bytes: Long
+    ) {
+        _uiState.value = _uiState.value.copy(netTxBytes = bytes)
     }
 
     fun setStatus(
@@ -89,5 +113,9 @@ class MainViewModel : ViewModel() {
             _uiState.value.copy(
                 logs = newLogs
             )
+    }
+
+    fun setLogs(logs: List<String>) {
+        _uiState.value = _uiState.value.copy(logs = logs.takeLast(20))
     }
 }

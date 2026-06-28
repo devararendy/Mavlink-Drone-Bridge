@@ -1,8 +1,14 @@
 package com.example.bismillah_learn_1
 
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.os.Bundle
+import android.os.IBinder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -10,107 +16,80 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.bismillah_learn_1.ui.MainViewModel
-import com.example.bismillah_learn_1.network.TcpServer
-import com.example.bismillah_learn_1.network.UdpServer
 import com.example.bismillah_learn_1.serial.UsbPermissionReceiver
-import com.example.bismillah_learn_1.serial.UsbSerialManager
-import androidx.activity.viewModels
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import com.example.bismillah_learn_1.service.BridgeService
+import com.example.bismillah_learn_1.ui.MainViewModel
 
 class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()
-    private var tcpServer: TcpServer? = null
-    private var udpServer: UdpServer? = null
     private var usbReceiver: UsbPermissionReceiver? = null
+    private var bridgeService: BridgeService? = null
+    private var isBound = false
 
-    override fun onCreate(
-        savedInstanceState: Bundle?
-    ) {
+    private val connection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            val binder = service as BridgeService.LocalBinder
+            bridgeService = binder.getService()
+            isBound = true
+            setupServiceCallbacks()
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            bridgeService = null
+            isBound = false
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val usbManager = UsbSerialManager(this)
+        // Bind to the service
+        Intent(this, BridgeService::class.java).also { intent ->
+            bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        }
 
         usbReceiver = UsbPermissionReceiver.register(this) { granted ->
             if (granted) {
                 vm.addLog("USB Permission Granted")
-                startSerialConnection(usbManager)
+                Intent(this, BridgeService::class.java).also { intent ->
+                    startForegroundService(intent)
+                }
+                bridgeService?.startBridge()
             } else {
                 vm.addLog("USB Permission Denied")
             }
         }
 
-        udpServer =
-            UdpServer(
-                port = 14550,
-                onDataReceived = {
-                    usbManager.enqueueWrite(it)
-                    runOnUiThread {
-                        vm.netAddRx(it.size.toLong())
-                        vm.usbAddTx(it.size.toLong())
-                    }
-                },
-                onClientConnected = {addr, prt ->
-                    vm.addLog("UDP Client Connected: $addr:$prt")
-                },
-            )
-
-        tcpServer =
-            TcpServer(
-                port = 5760,
-                onClientConnected = { updateClientInfo("Client Connected") },
-                onClientDisconnected = { updateClientInfo("Client Disconnected") },
-
-                onDataReceived = {
-                    usbManager.enqueueWrite(it)
-                    runOnUiThread {
-                        vm.netAddRx(it.size.toLong())
-                        vm.usbAddTx(it.size.toLong())
-                    }
-                }
-            )
-
         setContent {
-            val state by
-            vm.uiState.collectAsState()
+            val state by vm.uiState.collectAsState()
 
             MaterialTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-
+                Surface(modifier = Modifier.fillMaxSize()) {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(16.dp),
-
-                        verticalArrangement =
-                            Arrangement.spacedBy(
-                                12.dp
-                            )
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-
                         Text(
                             text = "DroneBridge",
                             style = MaterialTheme.typography.headlineMedium
                         )
 
-                        Card(
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)
-                            ) {
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(16.dp)) {
                                 Text("USB Device: ${state.usbDeviceName}")
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text("TCP Port: ${state.tcpPort}")
@@ -119,7 +98,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        Card( modifier = Modifier.fillMaxWidth()) {
+                        Card(modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text("USB RX Bytes: ${state.usbRxBytes}")
                                 Text("USB TX Bytes: ${state.usbTxBytes}")
@@ -128,18 +107,12 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        Card(
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-
+                        Card(modifier = Modifier.fillMaxWidth()) {
                             Column(
-                                modifier =
-                                    Modifier
-                                        .padding(16.dp)
-                                        .height(200.dp)
-                                        .verticalScroll(
-                                            rememberScrollState()
-                                        )
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .height(200.dp)
+                                    .verticalScroll(rememberScrollState())
                             ) {
                                 Text("Logs")
                                 state.logs.forEach {
@@ -150,10 +123,12 @@ class MainActivity : ComponentActivity() {
 
                         Button(
                             modifier = Modifier.fillMaxWidth(),
-
                             onClick = {
-                                if (usbManager.isConnected()) {
-                                    vm.addLog("USB already connected")
+                                val service = bridgeService ?: return@Button
+                                val usbManager = service.getUsbSerialManager() ?: return@Button
+
+                                if (service.isRunning()) {
+                                    vm.addLog("Service already running")
                                     return@Button
                                 }
 
@@ -162,19 +137,17 @@ class MainActivity : ComponentActivity() {
                                     vm.addLog("No USB device found")
                                     return@Button
                                 }
-                                
+
                                 val driver = devices[0]
                                 if (!usbManager.hasPermission(driver)) {
                                     usbManager.requestPermission(driver)
                                 } else {
                                     vm.addLog("Permission already granted")
-                                    startSerialConnection(usbManager)
+                                    Intent(this@MainActivity, BridgeService::class.java).also { intent ->
+                                        startForegroundService(intent)
+                                    }
+                                    service.startBridge()
                                 }
-
-                                tcpServer?.start()
-                                udpServer?.start()
-                                vm.setRunning(true)
-                                vm.setStatus("Running")
                             }
                         ) {
                             Text("START")
@@ -182,16 +155,8 @@ class MainActivity : ComponentActivity() {
 
                         OutlinedButton(
                             modifier = Modifier.fillMaxWidth(),
-
                             onClick = {
-                                tcpServer?.stop()
-                                udpServer?.stop()
-                                usbManager.stopWatchdog()
-                                usbManager.stopReading()
-                                usbManager.disconnect()
-                                vm.setRunning(false)
-                                vm.setStatus("Stopped")
-                                vm.setUsbDevice(false, "None")
+                                bridgeService?.stopBridge()
                             }
                         ) {
                             Text("STOP")
@@ -202,47 +167,39 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun updateClientInfo(status: String) {
-        runOnUiThread {
-            vm.setStatus(status)
-            vm.setClientCount(tcpServer?.clientCount() ?: 0)
-        }
-    }
-
-    private fun startSerialConnection(usbManager: UsbSerialManager) {
-        usbManager.startWatchdog(
-            baudRate = 115200,
-
-            onConnected = {
-                runOnUiThread {
-                    vm.addLog("Serial Connected")
-                    vm.setStatus("USB Connected")
-                    vm.setUsbDevice(true, usbManager.getDeviceName())
-                }
-            },
-
-            onSearching = {
-                runOnUiThread {
-                    vm.setStatus("USB Disconnected")
-                    vm.setUsbDevice(false, "None")
-                    vm.addLog("Searching USB...")
-                }
-            }
-
-        ) { data ->
-            tcpServer?.broadcast(data)
-            udpServer?.broadcast(data)
-            runOnUiThread {
-                vm.usbAddRx(data.size.toLong())
-                vm.netAddTx(data.size.toLong())
-                vm.addLog("USB RX: ${data.decodeToString()}")
+    private fun setupServiceCallbacks() {
+        bridgeService?.apply {
+            onLog = { vm.addLog(it) }
+            onStatusChanged = { vm.setStatus(it) }
+            onUsbStateChanged = { connected, name -> vm.setUsbDevice(connected, name) }
+            onUsbRx = { vm.usbAddRx(it) }
+            onUsbTx = { vm.usbAddTx(it) }
+            onNetRx = { vm.netAddRx(it) }
+            onNetTx = { vm.netAddTx(it) }
+            onClientCountChanged = { vm.setClientCount(it) }
+            onRunningChanged = { vm.setRunning(it) }
+            
+            // If already running, sync UI
+            if (isRunning()) {
+                vm.setRunning(true)
+                vm.setStatus("Running")
+                vm.setUsbDevice(getUsbSerialManager()?.isConnected() == true, getUsbSerialManager()?.getDeviceName() ?: "None")
+                vm.setUsbRx(getUsbRxTotal())
+                vm.setUsbTx(getUsbTxTotal())
+                vm.setNetRx(getNetRxTotal())
+                vm.setNetTx(getNetTxTotal())
+                vm.setClientCount(getClientCount())
+                vm.setLogs(getLogs())
             }
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        tcpServer?.stop()
+        if (isBound) {
+            unbindService(connection)
+            isBound = false
+        }
         usbReceiver?.let {
             try {
                 unregisterReceiver(it)
