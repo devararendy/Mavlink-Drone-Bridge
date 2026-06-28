@@ -1,0 +1,89 @@
+package com.example.bismillah_learn_1.ui
+
+import androidx.lifecycle.ViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+class MainViewModel : ViewModel() {
+
+    private val _uiState = MutableStateFlow(UiState())
+
+    val uiState: StateFlow<UiState> =
+        _uiState.asStateFlow()
+
+    fun setUsbDevice(
+        connected: Boolean,
+        name: String
+    ) {
+        _uiState.value =
+            _uiState.value.copy(
+                usbConnected = connected,
+                usbDeviceName = name
+            )
+    }
+
+    fun setRunning(
+        running: Boolean
+    ) {
+        _uiState.value =
+            _uiState.value.copy(
+                running = running,
+                status = if (running)
+                    "Running"
+                else
+                    "Stopped"
+            )
+    }
+
+    fun addRx(
+        bytes: Long
+    ) {
+        _uiState.value =
+            _uiState.value.copy(
+                rxBytes =
+                    _uiState.value.rxBytes + bytes
+            )
+    }
+
+    fun addTx(
+        bytes: Long
+    ) {
+        _uiState.value =
+            _uiState.value.copy(
+                txBytes =
+                    _uiState.value.txBytes + bytes
+            )
+    }
+
+    fun setStatus(
+        status: String
+    ) {
+        _uiState.value =
+            _uiState.value.copy(
+                status = status
+            )
+    }
+
+    fun setClientCount(
+        count: Int
+    ) {
+
+        _uiState.value =
+            _uiState.value.copy(
+                clientCount = count
+            )
+    }
+
+    fun addLog(message: String) {
+
+        val newLogs =
+            (_uiState.value.logs + message)
+                .takeLast(20)
+
+        _uiState.value =
+            _uiState.value.copy(
+                logs = newLogs
+            )
+    }
+}
