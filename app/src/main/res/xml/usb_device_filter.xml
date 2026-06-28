@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- An empty usb-device tag matches all USB devices.
+         This helps the system remember permission for the device. -->
+    <usb-device />
+</resources>

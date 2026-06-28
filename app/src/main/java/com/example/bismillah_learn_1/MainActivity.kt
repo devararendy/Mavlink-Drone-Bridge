@@ -40,6 +40,15 @@ class MainActivity : ComponentActivity() {
 
         val usbManager = UsbSerialManager(this)
 
+        usbReceiver = UsbPermissionReceiver.register(this) { granted ->
+            if (granted) {
+                vm.addLog("USB Permission Granted")
+                startSerialConnection(usbManager)
+            } else {
+                vm.addLog("USB Permission Denied")
+            }
+        }
+
         tcpServer =
             TcpServer(
                 port = 5760,
@@ -139,17 +148,6 @@ class MainActivity : ComponentActivity() {
                                 
                                 val driver = devices[0]
                                 if (!usbManager.hasPermission(driver)) {
-                                    usbReceiver?.let { 
-                                        try { unregisterReceiver(it) } catch(e: Exception) {}
-                                    }
-                                    usbReceiver = UsbPermissionReceiver.register(this@MainActivity) { granted ->
-                                        if (granted) {
-                                            vm.addLog("USB Permission Granted")
-                                            startSerialConnection(usbManager)
-                                        } else {
-                                            vm.addLog("USB Permission Denied")
-                                        }
-                                    }
                                     usbManager.requestPermission(driver)
                                 } else {
                                     vm.addLog("Permission already granted")
@@ -169,9 +167,10 @@ class MainActivity : ComponentActivity() {
 
                             onClick = {
                                 tcpServer?.stop()
-                                vm.setRunning(false)
+                                usbManager.stopWatchdog()
                                 usbManager.stopReading()
                                 usbManager.disconnect()
+                                vm.setRunning(false)
                                 vm.setStatus("Stopped")
                                 vm.setUsbDevice(false, "None")
                             }
@@ -192,30 +191,33 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startSerialConnection(usbManager: UsbSerialManager) {
-        usbManager.startAutoReconnect(
+        usbManager.startWatchdog(
             baudRate = 115200,
 
             onConnected = {
-                vm.addLog("Serial Connected")
-                vm.setStatus("USB Connected")
-                vm.setUsbDevice(true, usbManager.getDeviceName())
-                usbManager.startReading { data ->
-                    tcpServer?.broadcast(data)
-                    runOnUiThread {
-                        vm.usbAddRx(data.size.toLong())
-                        vm.netAddTx(data.size.toLong())
-                        vm.addLog("USB RX: ${data.decodeToString()}")
-                    }
+                runOnUiThread {
+                    vm.addLog("Serial Connected")
+                    vm.setStatus("USB Connected")
+                    vm.setUsbDevice(true, usbManager.getDeviceName())
                 }
             },
 
-            onFailed = {
+            onSearching = {
                 runOnUiThread {
+                    vm.setStatus("USB Disconnected")
                     vm.setUsbDevice(false, "None")
                     vm.addLog("Searching USB...")
                 }
             }
-        )
+
+        ) { data ->
+            tcpServer?.broadcast(data)
+            runOnUiThread {
+                vm.usbAddRx(data.size.toLong())
+                vm.netAddTx(data.size.toLong())
+                vm.addLog("USB RX: ${data.decodeToString()}")
+            }
+        }
     }
 
     override fun onDestroy() {

@@ -4,6 +4,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.hardware.usb.UsbManager
+import android.os.Build
+import android.widget.Toast
 import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialProber
 import com.hoho.android.usbserial.driver.UsbSerialPort
@@ -28,44 +30,47 @@ class UsbSerialManager(
     private var readJob: Job? = null
     private val txQueue = LinkedBlockingQueue<ByteArray>()
     private var txJob: Job? = null
-    private var reconnectJob: Job? = null
+    private var watchdogJob: Job? = null
+    private var reconnectCallback: ((ByteArray) -> Unit)? = null
+    private var lastPermissionRequestTime = 0L
 
-    fun startAutoReconnect(
+    fun startWatchdog(
         baudRate: Int = 115200,
         onConnected: () -> Unit = {},
-        onFailed: () -> Unit = {}
+        onSearching: () -> Unit = {},
+        onData: (ByteArray) -> Unit
     ) {
-        if (reconnectJob != null)
+        reconnectCallback = onData
+        if (watchdogJob != null)
             return
 
-        reconnectJob = CoroutineScope(Dispatchers.IO).launch {
-            while (true) {
+        watchdogJob = CoroutineScope(Dispatchers.IO).launch {
+            var wasSearching = false
+            while (isActive) {
                 try {
-                    if (isConnected()) {
-                        delay(1000)
-                        continue
-                    }
-                    val devices = findDevices()
-                    if (devices.isNotEmpty()) {
-                        val driver = devices[0]
-
-                        if (hasPermission(driver)) {
-                            if (connect(baudRate)) {
-                                onConnected()
-                                break
-                            }
+                    if (!isConnected()) {
+                        if (!wasSearching) {
+                            onSearching()
+                            wasSearching = true
                         }
+                        if (connect(baudRate)) {
+                            wasSearching = false
+                            startReading(onData)
+                            onConnected()
+                        }
+                    } else {
+                        wasSearching = false
                     }
-
                 } catch (_: Exception) {
                 }
-
-                onFailed()
                 delay(1000)
             }
-
-            reconnectJob = null
         }
+    }
+
+    fun stopWatchdog() {
+        watchdogJob?.cancel()
+        watchdogJob = null
     }
 
     fun enqueueWrite(
@@ -161,6 +166,9 @@ class UsbSerialManager(
     }
 
     fun disconnect() {
+        readJob?.cancel()
+        readJob = null
+
         txJob?.cancel()
         txJob = null
         txQueue.clear()
@@ -173,28 +181,29 @@ class UsbSerialManager(
         currentPort = null
     }
 
-    fun connect(
+    suspend fun connect(
         baudRate: Int = 115200
     ): Boolean {
-        val drivers =
-            findDevices()
-
-        if (drivers.isEmpty())
+        val drivers = findDevices()
+        if (drivers.isEmpty()) {
             return false
+        }
 
-        val driver =
-            drivers[0]
-
-        if (!hasPermission(driver))
+        val driver = drivers[0]
+        if (!hasPermission(driver)) {
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastPermissionRequestTime > 5000) {
+                lastPermissionRequestTime = currentTime
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Requesting USB permission...", Toast.LENGTH_SHORT).show()
+                }
+                requestPermission(driver)
+            }
             return false
+        }
 
-        val connection =
-            usbManager.openDevice(
-                driver.device
-            ) ?: return false
-
-        val port =
-            driver.ports[0]
+        val connection = usbManager.openDevice(driver.device) ?: return false
+        val port = driver.ports[0]
 
         port.open(connection)
 
@@ -227,6 +236,11 @@ class UsbSerialManager(
     fun requestPermission(
         driver: UsbSerialDriver
     ) {
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            PendingIntent.FLAG_MUTABLE
+        } else {
+            0
+        }
 
         val intent =
             PendingIntent.getBroadcast(
@@ -236,7 +250,7 @@ class UsbSerialManager(
                     UsbPermissionReceiver
                         .ACTION_USB_PERMISSION
                 ),
-                PendingIntent.FLAG_IMMUTABLE
+                flags
             )
 
         usbManager.requestPermission(
