@@ -27,24 +27,17 @@ class TcpServer(
 
         serverJob = CoroutineScope(Dispatchers.IO).launch {
 
-                serverSocket = ServerSocket(port)
-
-                while (isActive) {
-
-                    try {
-
-                        val client = serverSocket!!.accept()
-
-                        clients.add(client)
-
-                        onClientConnected(client.inetAddress.hostAddress ?: "unknown")
-
-                        startReader(client)
-
-                    } catch (_: Exception) {
-                    }
+            serverSocket = ServerSocket(port)
+            while (isActive) {
+                try {
+                    val client = serverSocket!!.accept()
+                    clients.add(client)
+                    onClientConnected(client.inetAddress.hostAddress ?: "unknown")
+                    startReader(client)
+                } catch (_: Exception) {
                 }
             }
+        }
     }
 
     private fun startReader(

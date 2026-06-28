@@ -91,6 +91,13 @@ class UsbSerialManager(
             }
     }
 
+    fun getDeviceName(): String {
+        val device = currentPort?.driver?.device
+        return device?.let {
+            "${it.manufacturerName ?: ""} ${it.productName ?: ""}".trim().ifEmpty { it.deviceName }
+        } ?: "No Device"
+    }
+
     fun isConnected(): Boolean {
         return currentPort != null
     }

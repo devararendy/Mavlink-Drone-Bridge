@@ -175,6 +175,7 @@ class MainActivity : ComponentActivity() {
                                 usbManager.stopReading()
                                 usbManager.disconnect()
                                 vm.setStatus("Stopped")
+                                vm.setUsbDevice(false, "None")
                             }
                         ) {
                             Text("STOP")
@@ -196,6 +197,7 @@ class MainActivity : ComponentActivity() {
         if (usbManager.connect(115200)) {
             vm.addLog("Serial Connected")
             vm.setStatus("USB Connected")
+            vm.setUsbDevice(true, usbManager.getDeviceName())
             usbManager.startReading { data ->
                 tcpServer?.broadcast(data)
                 runOnUiThread {
