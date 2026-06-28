@@ -26,7 +26,6 @@ class TcpServer(
             return
 
         serverJob = CoroutineScope(Dispatchers.IO).launch {
-
             serverSocket = ServerSocket(port)
             while (isActive) {
                 try {

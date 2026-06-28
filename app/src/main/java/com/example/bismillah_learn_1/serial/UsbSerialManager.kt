@@ -28,6 +28,45 @@ class UsbSerialManager(
     private var readJob: Job? = null
     private val txQueue = LinkedBlockingQueue<ByteArray>()
     private var txJob: Job? = null
+    private var reconnectJob: Job? = null
+
+    fun startAutoReconnect(
+        baudRate: Int = 115200,
+        onConnected: () -> Unit = {},
+        onFailed: () -> Unit = {}
+    ) {
+        if (reconnectJob != null)
+            return
+
+        reconnectJob = CoroutineScope(Dispatchers.IO).launch {
+            while (true) {
+                try {
+                    if (isConnected()) {
+                        delay(1000)
+                        continue
+                    }
+                    val devices = findDevices()
+                    if (devices.isNotEmpty()) {
+                        val driver = devices[0]
+
+                        if (hasPermission(driver)) {
+                            if (connect(baudRate)) {
+                                onConnected()
+                                break
+                            }
+                        }
+                    }
+
+                } catch (_: Exception) {
+                }
+
+                onFailed()
+                delay(1000)
+            }
+
+            reconnectJob = null
+        }
+    }
 
     fun enqueueWrite(
         data: ByteArray
@@ -85,6 +124,7 @@ class UsbSerialManager(
                         }
 
                     } catch (_: Exception) {
+                        disconnect()
                         break
                     }
                 }
@@ -208,7 +248,6 @@ class UsbSerialManager(
     fun hasPermission(
         driver: UsbSerialDriver
     ): Boolean {
-
         return usbManager.hasPermission(
             driver.device
         )

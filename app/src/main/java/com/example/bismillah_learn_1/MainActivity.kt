@@ -61,8 +61,7 @@ class MainActivity : ComponentActivity() {
 
             MaterialTheme {
                 Surface(
-                    modifier =
-                        Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize()
                 ) {
 
                     Column(
@@ -86,8 +85,7 @@ class MainActivity : ComponentActivity() {
                         ) {
                             Column(modifier = Modifier.padding(16.dp)
                             ) {
-                                Text("USB Device")
-                                Text(state.usbDeviceName)
+                                Text("USB Device: ${state.usbDeviceName}")
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text("TCP Port: ${state.tcpPort}")
                                 Text("Status: ${state.status}")
@@ -194,21 +192,30 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startSerialConnection(usbManager: UsbSerialManager) {
-        if (usbManager.connect(115200)) {
-            vm.addLog("Serial Connected")
-            vm.setStatus("USB Connected")
-            vm.setUsbDevice(true, usbManager.getDeviceName())
-            usbManager.startReading { data ->
-                tcpServer?.broadcast(data)
+        usbManager.startAutoReconnect(
+            baudRate = 115200,
+
+            onConnected = {
+                vm.addLog("Serial Connected")
+                vm.setStatus("USB Connected")
+                vm.setUsbDevice(true, usbManager.getDeviceName())
+                usbManager.startReading { data ->
+                    tcpServer?.broadcast(data)
+                    runOnUiThread {
+                        vm.usbAddRx(data.size.toLong())
+                        vm.netAddTx(data.size.toLong())
+                        vm.addLog("USB RX: ${data.decodeToString()}")
+                    }
+                }
+            },
+
+            onFailed = {
                 runOnUiThread {
-                    vm.usbAddRx(data.size.toLong())
-                    vm.netAddTx(data.size.toLong())
-                    vm.addLog("USB RX: ${data.decodeToString()}")
+                    vm.setUsbDevice(false, "None")
+                    vm.addLog("Searching USB...")
                 }
             }
-        } else {
-            vm.addLog("Serial Failed")
-        }
+        )
     }
 
     override fun onDestroy() {
