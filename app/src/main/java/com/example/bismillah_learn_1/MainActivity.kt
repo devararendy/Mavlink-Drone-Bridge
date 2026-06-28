@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.bismillah_learn_1.ui.MainViewModel
 import com.example.bismillah_learn_1.network.TcpServer
+import com.example.bismillah_learn_1.network.UdpServer
 import com.example.bismillah_learn_1.serial.UsbPermissionReceiver
 import com.example.bismillah_learn_1.serial.UsbSerialManager
 import androidx.activity.viewModels
@@ -31,6 +32,7 @@ import androidx.compose.foundation.verticalScroll
 class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()
     private var tcpServer: TcpServer? = null
+    private var udpServer: UdpServer? = null
     private var usbReceiver: UsbPermissionReceiver? = null
 
     override fun onCreate(
@@ -48,6 +50,18 @@ class MainActivity : ComponentActivity() {
                 vm.addLog("USB Permission Denied")
             }
         }
+
+        udpServer =
+            UdpServer(
+                port = 14550,
+                onDataReceived = {
+                    usbManager.enqueueWrite(it)
+                    runOnUiThread {
+                        vm.netAddRx(it.size.toLong())
+                        vm.usbAddTx(it.size.toLong())
+                    }
+                }
+            )
 
         tcpServer =
             TcpServer(
@@ -155,6 +169,7 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 tcpServer?.start()
+                                udpServer?.start()
                                 vm.setRunning(true)
                                 vm.setStatus("Running")
                             }
@@ -167,6 +182,7 @@ class MainActivity : ComponentActivity() {
 
                             onClick = {
                                 tcpServer?.stop()
+                                udpServer?.stop()
                                 usbManager.stopWatchdog()
                                 usbManager.stopReading()
                                 usbManager.disconnect()
@@ -212,6 +228,7 @@ class MainActivity : ComponentActivity() {
 
         ) { data ->
             tcpServer?.broadcast(data)
+            udpServer?.broadcast(data)
             runOnUiThread {
                 vm.usbAddRx(data.size.toLong())
                 vm.netAddTx(data.size.toLong())
