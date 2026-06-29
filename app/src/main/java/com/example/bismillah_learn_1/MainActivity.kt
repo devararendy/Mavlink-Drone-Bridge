@@ -267,8 +267,8 @@ class MainActivity : ComponentActivity() {
             onStreamingChanged = { vm.setStreaming(it) }
             
             // If already running, sync UI
-            if (isRunning()) {
-                vm.setRunning(true)
+            if (isRunning() || isStreaming()) {
+                vm.setRunning(isRunning())
                 vm.setStatus("Running")
                 vm.setUsbDevice(getUsbSerialManager()?.isConnected() == true, getUsbSerialManager()?.getDeviceName() ?: "None")
                 vm.setUsbRx(getUsbRxTotal())

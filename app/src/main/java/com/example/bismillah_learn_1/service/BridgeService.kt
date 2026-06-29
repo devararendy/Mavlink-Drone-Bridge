@@ -123,7 +123,7 @@ class BridgeService : Service() {
         }
     }
 
-    fun isRunning(): Boolean = tcpServer != null || udpServer != null || isStreaming()
+    fun isRunning(): Boolean = tcpServer != null || udpServer != null
 
     fun startBridge() {
         // Force connectedDevice type during bridge startup
