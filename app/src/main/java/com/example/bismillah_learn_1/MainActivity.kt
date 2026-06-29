@@ -25,15 +25,20 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.bismillah_learn_1.serial.UsbPermissionReceiver
 import com.example.bismillah_learn_1.service.BridgeService
 import com.example.bismillah_learn_1.ui.MainViewModel
+import com.example.bismillah_learn_1.ui.VideoProtocol
 
 class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()
@@ -124,6 +129,23 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier.fillMaxWidth()
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
+                                
+                                Text("Protocol:", style = MaterialTheme.typography.labelLarge)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    RadioButton(
+                                        selected = state.videoProtocol == VideoProtocol.MPEG_TS,
+                                        onClick = { vm.setVideoProtocol(VideoProtocol.MPEG_TS) }
+                                    )
+                                    Text("MPEG-TS (UDP)")
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    RadioButton(
+                                        selected = state.videoProtocol == VideoProtocol.H264_RAW,
+                                        onClick = { vm.setVideoProtocol(VideoProtocol.H264_RAW) }
+                                    )
+                                    Text("H.264 (RTSP)")
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Button(
                                     modifier = Modifier.fillMaxWidth(),
                                     onClick = {
@@ -134,7 +156,7 @@ class MainActivity : ComponentActivity() {
                                         if (state.isStreaming) {
                                             bridgeService?.stopStreaming()
                                         } else {
-                                            bridgeService?.startStreaming(state.videoIp)
+                                            bridgeService?.startStreaming(state.videoIp, state.videoProtocol)
                                         }
                                     }
                                 ) {

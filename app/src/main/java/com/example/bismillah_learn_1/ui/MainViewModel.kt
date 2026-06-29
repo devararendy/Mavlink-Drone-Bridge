@@ -126,4 +126,8 @@ class MainViewModel : ViewModel() {
     fun setStreaming(streaming: Boolean) {
         _uiState.value = _uiState.value.copy(isStreaming = streaming)
     }
+
+    fun setVideoProtocol(protocol: VideoProtocol) {
+        _uiState.value = _uiState.value.copy(videoProtocol = protocol)
+    }
 }

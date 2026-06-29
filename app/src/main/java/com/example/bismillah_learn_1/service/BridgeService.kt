@@ -14,6 +14,7 @@ import com.example.bismillah_learn_1.network.TcpServer
 import com.example.bismillah_learn_1.network.UdpServer
 import com.example.bismillah_learn_1.serial.UsbSerialManager
 import com.example.bismillah_learn_1.video.VideoManager
+import com.example.bismillah_learn_1.ui.VideoProtocol
 
 class BridgeService : Service() {
     private val binder = LocalBinder()
@@ -141,9 +142,9 @@ class BridgeService : Service() {
         }
     }
 
-    fun startStreaming(ip: String) {
-        videoManager?.startStream(ip)
-        addLog("Streaming started to $ip")
+    fun startStreaming(ip: String, protocol: VideoProtocol = VideoProtocol.MPEG_TS) {
+        videoManager?.startStream(protocol, ip)
+        addLog("Streaming started ($protocol) to $ip")
         handler.post { onStreamingChanged?.invoke(true) }
     }
 
