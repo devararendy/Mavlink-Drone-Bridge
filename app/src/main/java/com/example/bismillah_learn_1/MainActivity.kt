@@ -114,9 +114,16 @@ class MainActivity : ComponentActivity() {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text("USB Device: ${state.usbDeviceName}")
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text("TCP Port: ${state.tcpPort}")
+                                Text("TCP Server: ${state.tcpPort}, UDP Server: ${state.udpPort}")
                                 Text("Status: ${state.status}")
                                 Text("Clients: ${state.clientCount}")
+                            }
+                        }
+
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text("USB RX -> Net TX Bytes: ${state.usbRxBytes}")
+                                Text("USB TX -> Net RX Bytes: ${state.usbTxBytes}")
                             }
                         }
 
@@ -178,30 +185,7 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 ) {
-                                    Text(if (state.isStreaming) "STOP VIDEO" else "START VIDEO")
-                                }
-                            }
-                        }
-
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text("USB RX Bytes: ${state.usbRxBytes}")
-                                Text("USB TX Bytes: ${state.usbTxBytes}")
-                                Text("Net RX Bytes: ${state.netRxBytes}")
-                                Text("Net TX Bytes: ${state.netTxBytes}")
-                            }
-                        }
-
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(
-                                modifier = Modifier
-                                    .padding(16.dp)
-                                    .height(200.dp)
-                                    .verticalScroll(rememberScrollState())
-                            ) {
-                                Text("Logs")
-                                state.logs.forEach {
-                                    Text(it)
+                                    Text(if (state.isStreaming) "Stop Video" else "Start Video")
                                 }
                             }
                         }
@@ -235,6 +219,20 @@ class MainActivity : ComponentActivity() {
                             }
                         ) {
                             Text(if (state.running) "Stop Bridge" else "Start Bridge")
+                        }
+
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .height(200.dp)
+                                    .verticalScroll(rememberScrollState())
+                            ) {
+                                Text("Logs")
+                                state.logs.forEach {
+                                    Text(it)
+                                }
+                            }
                         }
                     }
                 }

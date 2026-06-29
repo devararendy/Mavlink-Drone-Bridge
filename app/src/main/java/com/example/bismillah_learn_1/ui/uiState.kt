@@ -9,6 +9,7 @@ data class UiState(
     val usbConnected: Boolean = false,
     val usbDeviceName: String = "No Device",
     val tcpPort: Int = 5760,
+    val udpPort: Int = 14550,
     val running: Boolean = false,
     val usbRxBytes: Long = 0,
     val usbTxBytes: Long = 0,
