@@ -11,6 +11,7 @@ data class UiState(
     val netTxBytes: Long = 0,
     val clientCount: Int = 0,
     val status: String = "Idle",
-
+    val videoIp: String = "192.168.1.1",
+    val isStreaming: Boolean = false,
     val logs: List<String> = emptyList()
 )

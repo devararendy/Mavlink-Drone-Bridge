@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import com.example.bismillah_learn_1.network.TcpServer
 import com.example.bismillah_learn_1.network.UdpServer
 import com.example.bismillah_learn_1.serial.UsbSerialManager
+import com.example.bismillah_learn_1.video.VideoManager
 
 class BridgeService : Service() {
     private val binder = LocalBinder()
@@ -21,6 +22,7 @@ class BridgeService : Service() {
     private var tcpServer: TcpServer? = null
     private var udpServer: UdpServer? = null
     private var usbSerialManager: UsbSerialManager? = null
+    private var videoManager: VideoManager? = null
 
     private var usbRxTotal: Long = 0
     private var usbTxTotal: Long = 0
@@ -39,6 +41,7 @@ class BridgeService : Service() {
     var onNetTx: ((Long) -> Unit)? = null
     var onClientCountChanged: ((Int) -> Unit)? = null
     var onRunningChanged: ((Boolean) -> Unit)? = null
+    var onStreamingChanged: ((Boolean) -> Unit)? = null
 
     inner class LocalBinder : Binder() {
         fun getService(): BridgeService = this@BridgeService
@@ -50,6 +53,8 @@ class BridgeService : Service() {
         super.onCreate()
         createNotificationChannel()
         usbSerialManager = UsbSerialManager(this)
+        videoManager = VideoManager(this)
+        videoManager?.init()
     }
 
     private fun createNotificationChannel() {
@@ -71,7 +76,7 @@ class BridgeService : Service() {
             .build()
     }
 
-    fun isRunning(): Boolean = tcpServer != null || udpServer != null
+    fun isRunning(): Boolean = tcpServer != null || udpServer != null || isStreaming()
 
     fun startBridge() {
         startForeground(1, getNotification())
@@ -136,6 +141,20 @@ class BridgeService : Service() {
         }
     }
 
+    fun startStreaming(ip: String) {
+        videoManager?.startStream(ip)
+        addLog("Streaming started to $ip")
+        handler.post { onStreamingChanged?.invoke(true) }
+    }
+
+    fun stopStreaming() {
+        videoManager?.stopStream()
+        addLog("Streaming stopped")
+        handler.post { onStreamingChanged?.invoke(false) }
+    }
+
+    fun isStreaming(): Boolean = videoManager?.isStreaming() ?: false
+
     private fun startSerialConnection() {
         val usbManager = usbSerialManager ?: return
         usbManager.startWatchdog(
@@ -180,6 +199,7 @@ class BridgeService : Service() {
         usbSerialManager?.stopWatchdog()
         usbSerialManager?.stopReading()
         usbSerialManager?.disconnect()
+        videoManager?.stopStream()
         
         handler.post {
             onRunningChanged?.invoke(false)
@@ -209,5 +229,10 @@ class BridgeService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         return START_STICKY
+    }
+
+    override fun onDestroy() {
+        videoManager?.release()
+        super.onDestroy()
     }
 }

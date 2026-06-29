@@ -118,4 +118,12 @@ class MainViewModel : ViewModel() {
     fun setLogs(logs: List<String>) {
         _uiState.value = _uiState.value.copy(logs = logs.takeLast(20))
     }
+
+    fun setVideoIp(ip: String) {
+        _uiState.value = _uiState.value.copy(videoIp = ip)
+    }
+
+    fun setStreaming(streaming: Boolean) {
+        _uiState.value = _uiState.value.copy(isStreaming = streaming)
+    }
 }

@@ -7,7 +7,9 @@ import android.content.ServiceConnection
 import android.os.Bundle
 import android.os.IBinder
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +24,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.collectAsState
@@ -74,13 +77,25 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val state by vm.uiState.collectAsState()
+            
+            val permissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestMultiplePermissions()
+            ) { permissions ->
+                val cameraGranted = permissions[android.Manifest.permission.CAMERA] ?: false
+                if (cameraGranted) {
+                    vm.addLog("Camera Permission Granted")
+                } else {
+                    vm.addLog("Camera Permission Denied")
+                }
+            }
 
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(16.dp),
+                            .padding(16.dp)
+                            .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
@@ -95,6 +110,36 @@ class MainActivity : ComponentActivity() {
                                 Text("TCP Port: ${state.tcpPort}")
                                 Text("Status: ${state.status}")
                                 Text("Clients: ${state.clientCount}")
+                            }
+                        }
+
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text("Video Stream", style = MaterialTheme.typography.titleMedium)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    value = state.videoIp,
+                                    onValueChange = { vm.setVideoIp(it) },
+                                    label = { Text("QGC IP Address") },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = {
+                                        permissionLauncher.launch(arrayOf(
+                                            android.Manifest.permission.CAMERA,
+                                            android.Manifest.permission.RECORD_AUDIO
+                                        ))
+                                        if (state.isStreaming) {
+                                            bridgeService?.stopStreaming()
+                                        } else {
+                                            bridgeService?.startStreaming(state.videoIp)
+                                        }
+                                    }
+                                ) {
+                                    Text(if (state.isStreaming) "STOP VIDEO" else "START VIDEO")
+                                }
                             }
                         }
 
@@ -178,6 +223,7 @@ class MainActivity : ComponentActivity() {
             onNetTx = { vm.netAddTx(it) }
             onClientCountChanged = { vm.setClientCount(it) }
             onRunningChanged = { vm.setRunning(it) }
+            onStreamingChanged = { vm.setStreaming(it) }
             
             // If already running, sync UI
             if (isRunning()) {
@@ -190,6 +236,7 @@ class MainActivity : ComponentActivity() {
                 vm.setNetTx(getNetTxTotal())
                 vm.setClientCount(getClientCount())
                 vm.setLogs(getLogs())
+                vm.setStreaming(isStreaming())
             }
         }
     }
