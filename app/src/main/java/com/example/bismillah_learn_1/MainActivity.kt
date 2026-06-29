@@ -87,8 +87,11 @@ class MainActivity : ComponentActivity() {
                 ActivityResultContracts.RequestMultiplePermissions()
             ) { permissions ->
                 val cameraGranted = permissions[android.Manifest.permission.CAMERA] ?: false
+                
                 if (cameraGranted) {
                     vm.addLog("Camera Permission Granted")
+                    // If the user just granted permission, they probably wanted to start the stream
+                    // But we won't auto-start here to avoid confusion, they can click again.
                 } else {
                     vm.addLog("Camera Permission Denied")
                 }
@@ -149,13 +152,29 @@ class MainActivity : ComponentActivity() {
                                 Button(
                                     modifier = Modifier.fillMaxWidth(),
                                     onClick = {
-                                        permissionLauncher.launch(arrayOf(
-                                            android.Manifest.permission.CAMERA,
-                                            android.Manifest.permission.RECORD_AUDIO
-                                        ))
+                                        val cameraPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                                            this@MainActivity,
+                                            android.Manifest.permission.CAMERA
+                                        )
+
+                                        if (cameraPermission != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                            val permissions = mutableListOf(
+                                                android.Manifest.permission.CAMERA,
+                                                android.Manifest.permission.RECORD_AUDIO
+                                            )
+                                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                                permissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
+                                            }
+                                            permissionLauncher.launch(permissions.toTypedArray())
+                                            return@Button
+                                        }
+
                                         if (state.isStreaming) {
                                             bridgeService?.stopStreaming()
                                         } else {
+                                            Intent(this@MainActivity, BridgeService::class.java).also { intent ->
+                                                startForegroundService(intent)
+                                            }
                                             bridgeService?.startStreaming(state.videoIp, state.videoProtocol)
                                         }
                                     }

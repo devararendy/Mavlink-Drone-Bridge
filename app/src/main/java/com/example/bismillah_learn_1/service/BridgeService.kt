@@ -1,11 +1,12 @@
 package com.example.bismillah_learn_1.service
 
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Binder
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -31,6 +32,8 @@ class BridgeService : Service() {
     private var netTxTotal: Long = 0
     private val logs = mutableListOf<String>()
     private val statsLock = Any()
+    
+    private var isForeground = false
 
     // Callbacks for UI updates
     var onLog: ((String) -> Unit)? = null
@@ -68,19 +71,63 @@ class BridgeService : Service() {
         manager.createNotificationChannel(channel)
     }
 
-    private fun getNotification(): Notification {
-        return NotificationCompat.Builder(this, "bridge_service")
-            .setContentTitle("DroneBridge Running")
-            .setContentText("USB and Network bridge is active")
+    private fun updateNotification(forceType: Int? = null) {
+        val bridgeActive = tcpServer != null || udpServer != null
+        val videoActive = videoManager?.isStreaming() == true
+        
+        val contentText = when {
+            bridgeActive && videoActive -> "Bridge and Video Stream active"
+            bridgeActive -> "USB and Network bridge active"
+            videoActive -> "Video Stream active"
+            else -> "Service standby"
+        }
+
+        val notification = NotificationCompat.Builder(this, "bridge_service")
+            .setContentTitle("DroneBridge")
+            .setContentText(contentText)
             .setSmallIcon(android.R.drawable.ic_menu_share)
             .setOngoing(true)
             .build()
+
+        var type = 0
+        if (bridgeActive) {
+            type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+        }
+        if (videoActive) {
+            type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+        }
+        
+        // Use forced type if provided (useful during startup)
+        val finalType = forceType ?: if (type == 0) {
+            // Fallback if nothing active yet but we need to stay in foreground
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+        } else {
+            type
+        }
+
+        if (!isForeground) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(1, notification, finalType)
+            } else {
+                startForeground(1, notification)
+            }
+            isForeground = true
+        } else {
+            val manager = getSystemService(NotificationManager::class.java)
+            // On API 34+, if types are declared, we must specify them or they will be removed
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(1, notification, finalType)
+            } else {
+                manager.notify(1, notification)
+            }
+        }
     }
 
     fun isRunning(): Boolean = tcpServer != null || udpServer != null || isStreaming()
 
     fun startBridge() {
-        startForeground(1, getNotification())
+        // Force connectedDevice type during bridge startup
+        updateNotification(ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
 
         val usbManager = usbSerialManager ?: return
 
@@ -140,18 +187,26 @@ class BridgeService : Service() {
             onRunningChanged?.invoke(true)
             onStatusChanged?.invoke("Running")
         }
+        
+        updateNotification()
     }
 
     fun startStreaming(ip: String, protocol: VideoProtocol = VideoProtocol.MPEG_TS) {
+        // Force camera type during video startup
+        updateNotification(ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
+        
         videoManager?.startStream(protocol, ip)
         addLog("Streaming started ($protocol) to $ip")
         handler.post { onStreamingChanged?.invoke(true) }
+        
+        updateNotification()
     }
 
     fun stopStreaming() {
         videoManager?.stopStream()
         addLog("Streaming stopped")
         handler.post { onStreamingChanged?.invoke(false) }
+        checkSelfStop()
     }
 
     fun isStreaming(): Boolean = videoManager?.isStreaming() ?: false
@@ -200,7 +255,6 @@ class BridgeService : Service() {
         usbSerialManager?.stopWatchdog()
         usbSerialManager?.stopReading()
         usbSerialManager?.disconnect()
-        videoManager?.stopStream()
         
         handler.post {
             onRunningChanged?.invoke(false)
@@ -208,8 +262,20 @@ class BridgeService : Service() {
             onUsbStateChanged?.invoke(false, "None")
         }
         
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        checkSelfStop()
+    }
+
+    private fun checkSelfStop() {
+        val bridgeActive = tcpServer != null || udpServer != null
+        val videoActive = videoManager?.isStreaming() == true
+        
+        if (!bridgeActive && !videoActive) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            isForeground = false
+            stopSelf()
+        } else {
+            updateNotification()
+        }
     }
 
     private fun addLog(msg: String) {
@@ -229,6 +295,10 @@ class BridgeService : Service() {
     fun getUsbSerialManager() = usbSerialManager
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Ensure we call startForeground within 5 seconds even if nothing else happened
+        if (!isForeground) {
+            updateNotification()
+        }
         return START_STICKY
     }
 

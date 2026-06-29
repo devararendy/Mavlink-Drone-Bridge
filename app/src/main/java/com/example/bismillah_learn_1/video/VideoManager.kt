@@ -66,7 +66,7 @@ class VideoManager(private val context: Context) : ConnectChecker {
                 VideoProtocol.MPEG_TS -> {
                     val url = "udp://$ip:$port"
                     if (udpCamera2?.prepareVideo(width, height, fps, bitrate, rotation) == true) {
-                        udpCamera2?.prepareAudio()
+//                        udpCamera2?.prepareAudio()
                         udpCamera2?.startStream(url)
                     }
                 }
