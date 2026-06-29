@@ -23,7 +23,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
@@ -210,42 +209,32 @@ class MainActivity : ComponentActivity() {
                         Button(
                             modifier = Modifier.fillMaxWidth(),
                             onClick = {
-                                val service = bridgeService ?: return@Button
-                                val usbManager = service.getUsbSerialManager() ?: return@Button
-
-                                if (service.isRunning()) {
-                                    vm.addLog("Service already running")
-                                    return@Button
-                                }
-
-                                val devices = usbManager.findDevices()
-                                if (devices.isEmpty()) {
-                                    vm.addLog("No USB device found")
-                                    return@Button
-                                }
-
-                                val driver = devices[0]
-                                if (!usbManager.hasPermission(driver)) {
-                                    usbManager.requestPermission(driver)
+                                if (state.running) {
+                                    bridgeService?.stopBridge()
                                 } else {
-                                    vm.addLog("Permission already granted")
-                                    Intent(this@MainActivity, BridgeService::class.java).also { intent ->
-                                        startForegroundService(intent)
+                                    val service = bridgeService ?: return@Button
+                                    val usbManager = service.getUsbSerialManager() ?: return@Button
+
+                                    val devices = usbManager.findDevices()
+                                    if (devices.isEmpty()) {
+                                        vm.addLog("No USB device found")
+                                        return@Button
                                     }
-                                    service.startBridge()
+
+                                    val driver = devices[0]
+                                    if (!usbManager.hasPermission(driver)) {
+                                        usbManager.requestPermission(driver)
+                                    } else {
+                                        vm.addLog("Permission already granted")
+                                        Intent(this@MainActivity, BridgeService::class.java).also { intent ->
+                                            startForegroundService(intent)
+                                        }
+                                        service.startBridge()
+                                    }
                                 }
                             }
                         ) {
-                            Text("START")
-                        }
-
-                        OutlinedButton(
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = {
-                                bridgeService?.stopBridge()
-                            }
-                        ) {
-                            Text("STOP")
+                            Text(if (state.running) "Stop Bridge" else "Start Bridge")
                         }
                     }
                 }
